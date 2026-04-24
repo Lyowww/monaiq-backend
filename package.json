@@ -5,8 +5,10 @@
   "scripts": {
     "clean": "node -e \"const fs=require('fs');['dist','tsconfig.build.tsbuildinfo','tsconfig.tsbuildinfo'].forEach((path)=>fs.rmSync(path,{recursive:true,force:true}))\"",
     "prebuild": "npm run clean",
+    "build:shared-types": "npm run build --prefix ./shared-types",
+    "postinstall": "npm run build:shared-types",
     "prestart:dev": "npm run clean",
-    "build": "nest build",
+    "build": "npm run build:shared-types && nest build",
     "start": "nest start",
     "start:dev": "node scripts/start-with-translation.cjs",
     "start:dev:api-only": "nest start --watch",
@@ -14,7 +16,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@ai-finance/shared-types": "0.1.0",
+    "@ai-finance/shared-types": "file:./shared-types",
     "@nestjs/common": "^11.1.19",
     "@nestjs/config": "^4.0.4",
     "@nestjs/core": "^11.1.19",
