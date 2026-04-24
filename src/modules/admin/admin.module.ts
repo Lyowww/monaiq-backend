@@ -24,9 +24,11 @@ import { AppSubscriptionsController } from './app-subscriptions.controller';
 import { SubscriptionPlansService } from './subscription-plans.service';
 import { AdminDataService } from './admin-data.service';
 import { AdminDataController } from './admin-data.controller';
+import { AiModule } from '../ai/ai.module';
 
 @Module({
   imports: [
+    AiModule,
     MongooseModule.forFeature([
       { name: User.name, schema: UserSchema },
       { name: Transaction.name, schema: TransactionSchema },

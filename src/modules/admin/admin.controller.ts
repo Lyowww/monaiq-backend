@@ -3,6 +3,8 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   Patch,
   Post,
@@ -16,6 +18,8 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import type { AccessTokenClaims } from '../auth/auth.types';
 import { AdminService } from './admin.service';
 import { SubscriptionPlansService } from './subscription-plans.service';
+import { TranslationService } from '../ai/translation.service';
+import { AdminTranslateBodyDto } from './dto/admin-translate.dto';
 
 @ApiTags('admin')
 @ApiBearerAuth('bearer')
@@ -24,8 +28,19 @@ import { SubscriptionPlansService } from './subscription-plans.service';
 export class AdminController {
   constructor(
     private readonly admin: AdminService,
-    private readonly subscriptionPlans: SubscriptionPlansService
+    private readonly subscriptionPlans: SubscriptionPlansService,
+    private readonly translation: TranslationService
   ) {}
+
+  @Post('translate')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Translate text via the translation sidecar (same service the AI module uses)'
+  })
+  async translate(@Body() body: AdminTranslateBodyDto) {
+    const translatedText = await this.translation.translate(body.text, body.to);
+    return { translatedText };
+  }
 
   @Get('summary')
   @ApiOperation({ summary: 'High-level app metrics' })
