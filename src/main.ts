@@ -17,6 +17,13 @@ async function getVercelExpressApp(): Promise<Express> {
     return vercelExpressApp;
   }
   const expressApp = express();
+  /** Rewrites send every path to `/api`; restore the real path for Nest routing. */
+  expressApp.use((req, _res, next) => {
+    if (req.originalUrl && req.url !== req.originalUrl) {
+      req.url = req.originalUrl;
+    }
+    next();
+  });
   const app = await NestFactory.create(
     AppModule,
     new ExpressAdapter(expressApp),
