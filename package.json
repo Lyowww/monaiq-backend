@@ -2,6 +2,9 @@
   "name": "@ai-finance/backend",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20 <23"
+  },
   "scripts": {
     "clean": "node -e \"const fs=require('fs');['dist','tsconfig.build.tsbuildinfo','tsconfig.tsbuildinfo'].forEach((path)=>fs.rmSync(path,{recursive:true,force:true}))\"",
     "prebuild": "npm run clean",

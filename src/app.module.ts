@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ScheduleModule } from '@nestjs/schedule';
+import { getMongooseModuleOptions } from './common/config/mongoose-connection-options';
 import { validateEnvironment } from './common/config/validate-environment';
 import { AiModule } from './modules/ai/ai.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -53,9 +54,8 @@ const adminStaticOrEmpty =
     ...adminStaticOrEmpty,
     MongooseModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        uri: configService.getOrThrow<string>('MONGODB_URI')
-      })
+      useFactory: (configService: ConfigService) =>
+        getMongooseModuleOptions(configService.getOrThrow<string>('MONGODB_URI'))
     }),
     ScheduleModule.forRoot(),
     FinanceDomainModule,
