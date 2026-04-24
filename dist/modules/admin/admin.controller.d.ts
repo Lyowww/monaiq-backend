@@ -1,10 +1,16 @@
 import type { AccessTokenClaims } from '../auth/auth.types';
 import { AdminService } from './admin.service';
 import { SubscriptionPlansService } from './subscription-plans.service';
+import { TranslationService } from '../ai/translation.service';
+import { AdminTranslateBodyDto } from './dto/admin-translate.dto';
 export declare class AdminController {
     private readonly admin;
     private readonly subscriptionPlans;
-    constructor(admin: AdminService, subscriptionPlans: SubscriptionPlansService);
+    private readonly translation;
+    constructor(admin: AdminService, subscriptionPlans: SubscriptionPlansService, translation: TranslationService);
+    translate(body: AdminTranslateBodyDto): Promise<{
+        translatedText: string;
+    }>;
     summary(): Promise<{
         users: number;
         transactions: number;

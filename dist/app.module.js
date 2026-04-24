@@ -25,7 +25,29 @@ const admin_module_1 = require("./modules/admin/admin.module");
 const fx_module_1 = require("./modules/fx/fx.module");
 const plans_module_1 = require("./modules/plans/plans.module");
 const serve_static_1 = require("@nestjs/serve-static");
+const fs_1 = require("fs");
 const path_1 = require("path");
+/**
+ * Optional: serve the admin SPA from this deploy. When admin is a separate static host or origin,
+ * leave `ADMIN_SPA_ROOT` unset. Path may be absolute or relative to the backend process cwd.
+ */
+function resolveAdminSpaRoot() {
+    const raw = process.env.ADMIN_SPA_ROOT?.trim();
+    if (!raw) {
+        return null;
+    }
+    return (0, path_1.isAbsolute)(raw) ? raw : (0, path_1.resolve)(process.cwd(), raw);
+}
+const adminSpaPath = resolveAdminSpaRoot();
+const adminStaticOrEmpty = adminSpaPath && (0, fs_1.existsSync)(adminSpaPath) && (0, fs_1.existsSync)((0, path_1.join)(adminSpaPath, 'index.html'))
+    ? [
+        serve_static_1.ServeStaticModule.forRoot({
+            rootPath: adminSpaPath,
+            serveRoot: '/admin',
+            serveStaticOptions: { index: 'index.html' }
+        })
+    ]
+    : [];
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -37,12 +59,7 @@ exports.AppModule = AppModule = __decorate([
                 cache: true,
                 validate: validate_environment_1.validateEnvironment
             }),
-            serve_static_1.ServeStaticModule.forRoot({
-                // From `dist/`, go to repo root `admin/dist` (Vite build)
-                rootPath: (0, path_1.join)(__dirname, '..', '..', 'admin', 'dist'),
-                serveRoot: '/admin',
-                serveStaticOptions: { index: 'index.html' }
-            }),
+            ...adminStaticOrEmpty,
             mongoose_1.MongooseModule.forRootAsync({
                 inject: [config_1.ConfigService],
                 useFactory: (configService) => ({

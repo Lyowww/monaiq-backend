@@ -20,12 +20,20 @@ const current_user_decorator_1 = require("../../common/decorators/current-user.d
 const jwt_auth_guard_1 = require("../../common/guards/jwt-auth.guard");
 const admin_service_1 = require("./admin.service");
 const subscription_plans_service_1 = require("./subscription-plans.service");
+const translation_service_1 = require("../ai/translation.service");
+const admin_translate_dto_1 = require("./dto/admin-translate.dto");
 let AdminController = class AdminController {
     admin;
     subscriptionPlans;
-    constructor(admin, subscriptionPlans) {
+    translation;
+    constructor(admin, subscriptionPlans, translation) {
         this.admin = admin;
         this.subscriptionPlans = subscriptionPlans;
+        this.translation = translation;
+    }
+    async translate(body) {
+        const translatedText = await this.translation.translate(body.text, body.to);
+        return { translatedText };
     }
     summary() {
         return this.admin.dashboardSummary();
@@ -62,6 +70,17 @@ let AdminController = class AdminController {
     }
 };
 exports.AdminController = AdminController;
+__decorate([
+    (0, common_1.Post)('translate'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
+    (0, swagger_1.ApiOperation)({
+        summary: 'Translate text via the translation sidecar (same service the AI module uses)'
+    }),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [admin_translate_dto_1.AdminTranslateBodyDto]),
+    __metadata("design:returntype", Promise)
+], AdminController.prototype, "translate", null);
 __decorate([
     (0, common_1.Get)('summary'),
     (0, swagger_1.ApiOperation)({ summary: 'High-level app metrics' }),
@@ -152,6 +171,7 @@ exports.AdminController = AdminController = __decorate([
     (0, common_1.Controller)('admin'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, admin_guard_1.AdminGuard),
     __metadata("design:paramtypes", [admin_service_1.AdminService,
-        subscription_plans_service_1.SubscriptionPlansService])
+        subscription_plans_service_1.SubscriptionPlansService,
+        translation_service_1.TranslationService])
 ], AdminController);
 //# sourceMappingURL=admin.controller.js.map

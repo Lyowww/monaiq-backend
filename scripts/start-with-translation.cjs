@@ -88,8 +88,8 @@ void (async () => {
   const nestSpawn = resolveNestSpawn();
   if (!nestSpawn) {
     console.error(
-      '[nest] Could not find @nestjs/cli. From the repo root run: npm install\n' +
-        '  (Nest is often hoisted to the root node_modules in npm workspaces.)'
+      '[nest] Could not find @nestjs/cli. Run `npm install` in the backend/ directory.\n' +
+        '  (With a non-workspace layout, dependencies live under backend/node_modules.)'
     );
     go.kill('SIGTERM');
     process.exit(1);

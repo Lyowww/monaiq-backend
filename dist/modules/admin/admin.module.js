@@ -33,12 +33,14 @@ const app_subscriptions_controller_1 = require("./app-subscriptions.controller")
 const subscription_plans_service_1 = require("./subscription-plans.service");
 const admin_data_service_1 = require("./admin-data.service");
 const admin_data_controller_1 = require("./admin-data.controller");
+const ai_module_1 = require("../ai/ai.module");
 let AdminModule = class AdminModule {
 };
 exports.AdminModule = AdminModule;
 exports.AdminModule = AdminModule = __decorate([
     (0, common_1.Module)({
         imports: [
+            ai_module_1.AiModule,
             mongoose_1.MongooseModule.forFeature([
                 { name: user_schema_1.User.name, schema: user_schema_1.UserSchema },
                 { name: transaction_schema_1.Transaction.name, schema: transaction_schema_1.TransactionSchema },
