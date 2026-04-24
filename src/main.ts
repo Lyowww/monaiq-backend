@@ -9,15 +9,60 @@ const isVercelRuntime = Boolean(
   process.env.VERCEL || process.env.VERCEL_ENV
 );
 
-/** Cached Nest-backed Express app for Vercel (same pattern as `api/[...route].ts` in the monorepo). */
-let vercelExpressApp: Express | null = null;
+let vercelExpressSingleton: Express | null = null;
+let vercelExpressBoot: Promise<Express> | null = null;
 
-async function getVercelExpressApp(): Promise<Express> {
-  if (vercelExpressApp) {
-    return vercelExpressApp;
-  }
+/**
+ * Vercel may freeze the invocation when the handler promise resolves before Express sends the
+ * response. Wait for `finish` / `close` so the client receives the body reliably.
+ */
+function runExpressUntilResponseEnds(
+  server: Express,
+  request: Request,
+  response: Response
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const cleanup = (): void => {
+      response.removeListener('finish', onFinish);
+      response.removeListener('close', onClose);
+      response.removeListener('error', onError);
+    };
+    const settleOk = (): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      cleanup();
+      resolve();
+    };
+    const onFinish = (): void => settleOk();
+    const onClose = (): void => {
+      if (!response.writableFinished) {
+        settleOk();
+      }
+    };
+    const onError = (err: Error): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      cleanup();
+      reject(err);
+    };
+    response.once('finish', onFinish);
+    response.once('close', onClose);
+    response.once('error', onError);
+    try {
+      server(request, response);
+    } catch (err) {
+      onError(err instanceof Error ? err : new Error(String(err)));
+    }
+  });
+}
+
+async function createVercelExpressApp(): Promise<Express> {
   const expressApp = express();
-  /** Rewrites send every path to `/api`; restore the real path for Nest routing. */
   expressApp.use((req, _res, next) => {
     if (req.originalUrl && req.url !== req.originalUrl) {
       req.url = req.originalUrl;
@@ -31,20 +76,38 @@ async function getVercelExpressApp(): Promise<Express> {
   );
   await configureApp(app, { useGlobalPrefix: true });
   await app.init();
-  vercelExpressApp = expressApp;
   return expressApp;
 }
 
+async function getVercelExpressApp(): Promise<Express> {
+  if (vercelExpressSingleton) {
+    return vercelExpressSingleton;
+  }
+  if (!vercelExpressBoot) {
+    vercelExpressBoot = createVercelExpressApp()
+      .then((ex) => {
+        vercelExpressSingleton = ex;
+        return ex;
+      })
+      .catch((err) => {
+        vercelExpressBoot = null;
+        vercelExpressSingleton = null;
+        throw err;
+      });
+  }
+  return vercelExpressBoot;
+}
+
 /**
- * Vercel may treat `src/main` as the serverless entry; a default export is required
- * (see "No exports found in module" / "Did you forget to export a function or a server?").
+ * Vercel serverless entry (see `api/index.js`). Must keep the invocation alive until the response
+ * is fully written.
  */
 export default async function vercelHandler(
   request: Request,
   response: Response
 ): Promise<void> {
   const server = await getVercelExpressApp();
-  server(request, response);
+  await runExpressUntilResponseEnds(server, request, response);
 }
 
 async function bootstrap(): Promise<void> {

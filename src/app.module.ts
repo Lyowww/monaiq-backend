@@ -16,9 +16,15 @@ import { UsersModule } from './modules/users/users.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { FxModule } from './modules/fx/fx.module';
 import { PlansModule } from './modules/plans/plans.module';
+import { VercelSwaggerModule } from './vercel/vercel-swagger.module';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { existsSync } from 'fs';
 import { isAbsolute, join, resolve } from 'path';
+
+const isVercelRuntime = Boolean(
+  process.env.VERCEL || process.env.VERCEL_ENV
+);
+const vercelSwaggerOrEmpty = isVercelRuntime ? [VercelSwaggerModule] : [];
 
 /**
  * Optional: serve the admin SPA from this deploy. When admin is a separate static host or origin,
@@ -52,6 +58,7 @@ const adminStaticOrEmpty =
       validate: validateEnvironment
     }),
     ...adminStaticOrEmpty,
+    ...vercelSwaggerOrEmpty,
     MongooseModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) =>

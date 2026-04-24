@@ -30,9 +30,10 @@ export function getMongooseModuleOptions(
     uri,
     minPoolSize: 0,
     maxPoolSize: 5,
-    serverSelectionTimeoutMS: 30_000,
+    /** Fail before Vercel’s default function timeout so the client sees an error, not endless spin. */
+    serverSelectionTimeoutMS: 14_000,
     socketTimeoutMS: 45_000,
-    connectTimeoutMS: 20_000,
+    connectTimeoutMS: 12_000,
     maxIdleTimeMS: 30_000,
     retryWrites: true
   };
