@@ -16,6 +16,7 @@ import { UsersModule } from './modules/users/users.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { FxModule } from './modules/fx/fx.module';
 import { PlansModule } from './modules/plans/plans.module';
+import { WaitlistModule } from './modules/waitlist/waitlist.module';
 import { VercelSwaggerModule } from './vercel/vercel-swagger.module';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { existsSync } from 'fs';
@@ -76,7 +77,8 @@ const adminStaticOrEmpty =
     PlansModule,
     FxModule,
     AiModule,
-    AdminModule
+    AdminModule,
+    WaitlistModule
   ]
 })
 export class AppModule {}

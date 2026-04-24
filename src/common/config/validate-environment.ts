@@ -21,6 +21,12 @@ type EnvironmentShape = {
   FIREBASE_SERVICE_ACCOUNT_JSON?: string;
   /** Base URL for the Go translation sidecar (`POST /translate`). Default: http://127.0.0.1:8000 */
   TRANSLATION_SERVICE_URL?: string;
+  /** Resend API key — https://resend.com (waitlist thank-you emails) */
+  RESEND_API_KEY?: string;
+  /** Sender for waitlist emails, e.g. `Mon AIq <notify@yourdomain.com>` (domain must be verified in Resend) */
+  WAITLIST_EMAIL_FROM?: string;
+  /** Public Instagram profile URL shown in waitlist emails */
+  WAITLIST_INSTAGRAM_URL?: string;
 };
 
 function requireString(value: unknown, key: string): string {
@@ -76,6 +82,16 @@ export function validateEnvironment(config: Record<string, unknown>): Environmen
     TRANSLATION_SERVICE_URL:
       typeof config.TRANSLATION_SERVICE_URL === 'string'
         ? config.TRANSLATION_SERVICE_URL.trim()
+        : undefined,
+    RESEND_API_KEY:
+      typeof config.RESEND_API_KEY === 'string' ? config.RESEND_API_KEY.trim() : undefined,
+    WAITLIST_EMAIL_FROM:
+      typeof config.WAITLIST_EMAIL_FROM === 'string'
+        ? config.WAITLIST_EMAIL_FROM.trim()
+        : undefined,
+    WAITLIST_INSTAGRAM_URL:
+      typeof config.WAITLIST_INSTAGRAM_URL === 'string'
+        ? config.WAITLIST_INSTAGRAM_URL.trim()
         : undefined
   };
 }
