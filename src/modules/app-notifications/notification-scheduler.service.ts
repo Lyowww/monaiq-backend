@@ -3,9 +3,9 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Cron } from '@nestjs/schedule';
 import { User, UserDocument } from '../users/schemas/user.schema';
-import { Debt, DebtDocument } from '../debts/schemas/debt.schema';
+import { Debt } from '../debts/schemas/debt.schema';
 import { Transaction } from '../transactions/schemas/transaction.schema';
-import { ScheduledPayment, ScheduledPaymentDocument } from '../scheduled-payments/schemas/scheduled-payment.schema';
+import { ScheduledPayment } from '../scheduled-payments/schemas/scheduled-payment.schema';
 import { AppNotificationsService } from './app-notifications.service';
 
 function startOfUtcDay(d: Date): Date {

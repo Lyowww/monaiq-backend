@@ -346,8 +346,7 @@ export class OpenRouterLlmService {
           client,
           model,
           messages,
-          pathLabel,
-          started
+          pathLabel
         );
         const ms = Date.now() - started;
         const parts = [`OpenRouter success with ${model} in ${ms}ms`];
@@ -394,8 +393,7 @@ export class OpenRouterLlmService {
     client: OpenRouterClient,
     model: string,
     messages: { role: 'system' | 'user' | 'assistant'; content: string }[],
-    pathLabel: string,
-    _started: number
+    pathLabel: string
   ): Promise<{ text: string; hadRetries: boolean }> {
     let lastErr: unknown;
     for (let attempt = 0; attempt < ATTEMPTS_PER_MODEL; attempt++) {

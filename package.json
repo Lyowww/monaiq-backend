@@ -12,7 +12,8 @@
     "postinstall": "npm run build:shared-types",
     "prestart:dev": "npm run clean",
     "build": "npm run build:shared-types && nest build",
-    "start": "nest start",
+    "start": "node dist/main.js",
+    "start:nest": "nest start",
     "start:dev": "node scripts/start-with-translation.cjs",
     "start:dev:api-only": "nest start --watch",
     "lint": "eslint \"src/**/*.ts\"",
@@ -45,6 +46,7 @@
     "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@nestjs/cli": "^11.0.21",
     "@nestjs/schematics": "^11.1.0",
     "@types/aws-lambda": "^8.10.161",
@@ -55,6 +57,7 @@
     "@typescript-eslint/eslint-plugin": "^8.59.0",
     "@typescript-eslint/parser": "^8.59.0",
     "eslint": "^10.2.1",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.59.0"
   }
 }

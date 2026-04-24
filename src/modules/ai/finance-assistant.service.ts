@@ -261,7 +261,7 @@ const FINANCE_SIGNAL = new RegExp(
     'how (much|do|is|are|can|should|am i)|can i|should i|what did|where did|is my|do i have|am i on',
     'ծախս|մնացորդ|դրամ|պարտք|վճար|եկամուտ|վարձ|խնայ|ֆինանս|անձնական',
     'կարո|ինչ(ու|քան)|ու[րն]', // hy: can I / why / where
-    '\b\d{2,}\b' // 2+ digit number — often a price
+    '\\b\\d{2,}\\b' // 2+ digit number — often a price
   ].join('|'),
   'i'
 );

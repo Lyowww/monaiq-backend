@@ -209,7 +209,7 @@ export class AuthService {
 
   /** Ensures a DB user exists for env-based admin login (refresh tokens need a real user id). */
   private async ensureEnvAdminUser(email: string): Promise<UserDocument> {
-    let user = await this.usersService.findByEmail(email);
+    const user = await this.usersService.findByEmail(email);
     if (user) {
       if (!user.isAdmin) {
         user.isAdmin = true;
