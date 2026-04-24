@@ -34,23 +34,7 @@ const RETRYABLE_OPENROUTER_ERROR_NAMES = new Set<string>([
   'EdgeNetworkTimeoutResponseError'
 ]);
 
-type SystemUserMessage =
-  | { role: 'system' | 'user' | 'assistant'; content: string }
-  | { role: 'user' | 'assistant'; content: string };
-
-type OpenRouterModule = {
-  OpenRouter: new (opts: { apiKey: string }) => {
-    chat: {
-      send: (req: {
-        chatRequest: {
-          model: string;
-          messages: SystemUserMessage[] | Array<{ role: 'user'; content: string }>;
-          stream: boolean;
-        };
-      }) => Promise<AsyncIterable<StreamChunk> | NonStreamResult>;
-    };
-  };
-};
+const OPENROUTER_CHAT_COMPLETIONS_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
 type NonStreamResult = {
   choices: Array<{
@@ -58,23 +42,112 @@ type NonStreamResult = {
   }>;
 };
 
-type StreamChunk = {
-  choices: Array<{
-    delta: {
-      content?: string | null;
-      reasoning?: string | null;
-    };
-  }>;
-  usage?: {
-    totalTokens: number;
-    promptTokens: number;
-    completionTokens: number;
-    completionTokensDetails?: { reasoningTokens?: number | null } | null;
-  };
+function httpStatusToOpenRouterErrorName(status: number): string {
+  switch (status) {
+    case 400:
+      return 'BadRequestResponseError';
+    case 401:
+      return 'UnauthorizedResponseError';
+    case 402:
+      return 'PaymentRequiredResponseError';
+    case 403:
+      return 'ForbiddenResponseError';
+    case 404:
+      return 'NotFoundResponseError';
+    case 408:
+      return 'RequestTimeoutResponseError';
+    case 413:
+      return 'PayloadTooLargeResponseError';
+    case 422:
+      return 'UnprocessableEntityResponseError';
+    case 429:
+      return 'TooManyRequestsResponseError';
+    case 500:
+      return 'InternalServerResponseError';
+    case 502:
+      return 'BadGatewayResponseError';
+    case 503:
+      return 'ServiceUnavailableResponseError';
+    case 504:
+      return 'EdgeNetworkTimeoutResponseError';
+    default:
+      return 'Error';
+  }
+}
+
+function throwOpenRouterHttpError(res: Response, bodyText: string): never {
+  const err = new Error(
+    bodyText.length > 0 ? bodyText.slice(0, 800) : res.statusText || `HTTP ${res.status}`
+  ) as Error & { name: string; statusCode: number };
+  err.name = httpStatusToOpenRouterErrorName(res.status);
+  err.statusCode = res.status;
+  throw err;
+}
+
+type RawSseChunk = {
+  choices?: Array<{ delta?: { content?: string | null; reasoning?: string | null } }>;
+  usage?: Record<string, unknown>;
   error?: { code: number; message: string };
 };
 
-type OpenRouterClient = InstanceType<OpenRouterModule['OpenRouter']>;
+function num(...vals: unknown[]): number | undefined {
+  for (const v of vals) {
+    if (typeof v === 'number' && Number.isFinite(v)) {
+      return v;
+    }
+  }
+  return undefined;
+}
+
+async function* parseOpenRouterSse(
+  body: ReadableStream<Uint8Array> | null
+): AsyncGenerator<RawSseChunk> {
+  if (!body) {
+    return;
+  }
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? '';
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith('data:')) {
+          continue;
+        }
+        const data = trimmed.slice(5).trim();
+        if (data === '[DONE]') {
+          return;
+        }
+        try {
+          yield JSON.parse(data) as RawSseChunk;
+        } catch {
+          /* skip non-JSON line */
+        }
+      }
+    }
+    const tail = buffer.trim();
+    if (tail.startsWith('data:')) {
+      const data = tail.slice(5).trim();
+      if (data && data !== '[DONE]') {
+        try {
+          yield JSON.parse(data) as RawSseChunk;
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
 
 export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -268,7 +341,6 @@ function extractAssistantText(result: NonStreamResult): string | null {
 @Injectable()
 export class OpenRouterLlmService {
   private readonly logger = new Logger(OpenRouterLlmService.name);
-  private clientPromise: Promise<OpenRouterClient> | null = null;
 
   constructor(private readonly configService: ConfigService) {}
 
@@ -297,18 +369,16 @@ export class OpenRouterLlmService {
     return key.trim();
   }
 
-  private async loadSdk(): Promise<OpenRouterClient> {
-    const { OpenRouter } = (await import(
-      '@openrouter/sdk'
-    )) as unknown as OpenRouterModule;
-    return new OpenRouter({ apiKey: this.getApiKey() });
-  }
-
-  private async getClient(): Promise<OpenRouterClient> {
-    if (!this.clientPromise) {
-      this.clientPromise = this.loadSdk();
+  private openRouterFetchHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${this.getApiKey()}`
+    };
+    const referer = this.configService.get<string>('OPENROUTER_HTTP_REFERER')?.trim();
+    if (referer?.length) {
+      headers.Referer = referer;
     }
-    return this.clientPromise;
+    return headers;
   }
 
   /**
@@ -333,7 +403,6 @@ export class OpenRouterLlmService {
       );
     }
 
-    const client = await this.getClient();
     const models = this.getFallbackModels();
     const started = Date.now();
 
@@ -342,12 +411,7 @@ export class OpenRouterLlmService {
       const pathLabel = `model[${mi + 1}/${models.length}]=${model}`;
 
       try {
-        const { text, hadRetries } = await this.tryModelWithRetries(
-          client,
-          model,
-          messages,
-          pathLabel
-        );
+        const { text, hadRetries } = await this.tryModelWithRetries(model, messages, pathLabel);
         const ms = Date.now() - started;
         const parts = [`OpenRouter success with ${model} in ${ms}ms`];
         if (mi > 0) {
@@ -390,7 +454,6 @@ export class OpenRouterLlmService {
   }
 
   private async tryModelWithRetries(
-    client: OpenRouterClient,
     model: string,
     messages: { role: 'system' | 'user' | 'assistant'; content: string }[],
     pathLabel: string
@@ -406,7 +469,7 @@ export class OpenRouterLlmService {
       this.logger.log(`OpenRouter attempt ${attempt + 1} with ${model} (${pathLabel})`);
 
       try {
-        const text = await this.callOpenRouter(client, model, messages);
+        const text = await this.callOpenRouter(model, messages);
         return { text, hadRetries: attempt > 0 };
       } catch (err) {
         lastErr = err;
@@ -439,18 +502,25 @@ export class OpenRouterLlmService {
   }
 
   private async callOpenRouter(
-    client: OpenRouterClient,
     model: string,
     messages: { role: 'system' | 'user' | 'assistant'; content: string }[]
   ): Promise<string> {
     const t0 = Date.now();
-    const result = (await client.chat.send({
-      chatRequest: {
-        model,
-        messages,
-        stream: false
-      }
-    })) as NonStreamResult;
+    const res = await fetch(OPENROUTER_CHAT_COMPLETIONS_URL, {
+      method: 'POST',
+      headers: this.openRouterFetchHeaders(),
+      body: JSON.stringify({ model, messages, stream: false })
+    });
+    const rawText = await res.text();
+    if (!res.ok) {
+      throwOpenRouterHttpError(res, rawText);
+    }
+    let result: NonStreamResult;
+    try {
+      result = JSON.parse(rawText) as NonStreamResult;
+    } catch {
+      throw new ServiceUnavailableException('OpenRouter returned invalid JSON.');
+    }
 
     const text = extractAssistantText(result);
     if (text) {
@@ -478,7 +548,6 @@ export class OpenRouterLlmService {
       maxUserChars: DEFAULT_MAX_USER_CHARS
     });
 
-    const client = await this.getClient();
     const models = this.getFallbackModels();
     let lastErr: unknown;
 
@@ -496,19 +565,21 @@ export class OpenRouterLlmService {
 
         this.logger.log(`OpenRouter stream attempt ${attempt + 1} with ${model}`);
         try {
-          const stream = (await client.chat.send({
-            chatRequest: {
-              model,
-              messages: leanMsg,
-              stream: true
-            }
-          })) as AsyncIterable<StreamChunk>;
+          const res = await fetch(OPENROUTER_CHAT_COMPLETIONS_URL, {
+            method: 'POST',
+            headers: this.openRouterFetchHeaders(),
+            body: JSON.stringify({ model, messages: leanMsg, stream: true })
+          });
+          if (!res.ok) {
+            const errBody = await res.text();
+            throwOpenRouterHttpError(res, errBody);
+          }
 
-          for await (const raw of stream) {
-            if (raw.error) {
-              throw new Error(raw.error.message || 'OpenRouter stream error');
+          for await (const rawChunk of parseOpenRouterSse(res.body)) {
+            if (rawChunk.error) {
+              throw new Error(rawChunk.error.message || 'OpenRouter stream error');
             }
-            const delta = raw.choices[0]?.delta;
+            const delta = rawChunk.choices?.[0]?.delta;
             if (delta) {
               const text = typeof delta.content === 'string' ? delta.content : '';
               const reasoning = typeof delta.reasoning === 'string' ? delta.reasoning : '';
@@ -516,18 +587,34 @@ export class OpenRouterLlmService {
                 yield { kind: 'delta', text, reasoning };
               }
             }
-            if (raw.usage) {
-              const u = raw.usage;
-              const reasoningFromDetails = u.completionTokensDetails?.reasoningTokens;
-              yield {
-                kind: 'usage',
-                usage: {
-                  totalTokens: u.totalTokens,
-                  promptTokens: u.promptTokens,
-                  completionTokens: u.completionTokens,
-                  reasoningTokens: reasoningFromDetails ?? null
-                }
-              };
+            const uRaw = rawChunk.usage;
+            if (uRaw && typeof uRaw === 'object') {
+              const totalTokens = num(uRaw.total_tokens, uRaw.totalTokens);
+              const promptTokens = num(uRaw.prompt_tokens, uRaw.promptTokens);
+              const completionTokens = num(uRaw.completion_tokens, uRaw.completionTokens);
+              const details = uRaw.completion_tokens_details ?? uRaw.completionTokensDetails;
+              const reasoningFromDetails =
+                details && typeof details === 'object'
+                  ? num(
+                      (details as Record<string, unknown>).reasoning_tokens,
+                      (details as Record<string, unknown>).reasoningTokens
+                    )
+                  : undefined;
+              if (
+                totalTokens !== undefined ||
+                promptTokens !== undefined ||
+                completionTokens !== undefined
+              ) {
+                yield {
+                  kind: 'usage',
+                  usage: {
+                    totalTokens: totalTokens ?? 0,
+                    promptTokens: promptTokens ?? 0,
+                    completionTokens: completionTokens ?? 0,
+                    reasoningTokens: reasoningFromDetails ?? null
+                  }
+                };
+              }
             }
           }
           this.logger.log(`OpenRouter stream success with model ${model}`);
