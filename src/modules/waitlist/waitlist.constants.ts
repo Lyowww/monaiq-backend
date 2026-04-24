@@ -22,8 +22,8 @@ export function buildWaitlistThankYouEmailHtml(instagramUrl: string): string {
       <p style="margin:0 0 16px;">Շնորհակալություն, որ միացաք <strong>MonAIQ</strong> հավելվածի սպասման ցուցակին։ Ձեր հետաքրքրությունը մեզ համար շատ կարևոր է, և մենք ակտիվորեն աշխատում ենք, որպեսզի հավելվածը շուտով Ձեզ հասանելի դարձնենք։</p>
       <p style="margin:0 0 16px;">Երբ հավելվածը պատրաստ լինի, կտեղեկացնենք Ձեզ էլեկտրոնային փոստով։</p>
       <p style="margin:0 0 8px;">Մինչ այդ կարող եք <strong>հետևել մեզ Instagram-ում</strong>՝ հավելվածի նորություններին, թարմացումներին և գործարկմանը վերաբերող հայտարարություններին ժամանակին տեղեկացված մնալու համար՝</p>
-      <p style="margin:0 0 24px;"><a href="${safeUrl}" style="color:#2563eb;">${safeUrl}</a></p>
-      <p style="margin:0;color:#525252;font-size:14px;">Հարգանքներով,<br />MonAIQ թիմ</p>
+      <p style="margin:0 0 24px;"><a href="${safeUrl}" style="color:#2563eb;">Instagram</a></p>
+      <p style="margin:0;color:#525252;font-size:14px;">Հարգանքով,<br />MonAIQ թիմ</p>
     </td></tr>
   </table>
 </body>
